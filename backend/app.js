@@ -39,6 +39,7 @@ const corsOptionsDelegate = (req, callback) => {
 }
 
 app.use(cors(corsOptionsDelegate))
+app.options(/.*/, cors(corsOptionsDelegate))
 app.use(express.json({ limit: '4mb' }))
 app.use(express.urlencoded({ extended: true }))
 
