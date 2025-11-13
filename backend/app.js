@@ -25,17 +25,21 @@ const envOrigins = process.env.FRONTEND_URLS
   : (process.env.FRONTEND_URL ? [process.env.FRONTEND_URL] : devFallbackOrigins)
 const allowedOrigins = new Set(envOrigins)
 
-app.use(
-  cors({
-    origin: (origin, callback) => {
-      if (!origin) return callback(null, true)
-      if (allowedOrigins.has(origin)) return callback(null, true)
-      return callback(new Error(`CORS: Origin not allowed: ${origin}`))
-    },
-    credentials: true,
-  })
-)
-app.options('*', cors())
+const corsOptionsDelegate = (req, callback) => {
+  const origin = req.header('Origin')
+  if (!origin) return callback(null, { origin: true, credentials: true })
+  if (allowedOrigins.has(origin)) return callback(null, { origin: true, credentials: true })
+  try {
+    const originHost = new URL(origin).host
+    if (originHost === req.headers.host) {
+      return callback(null, { origin: true, credentials: true })
+    }
+  } catch {}
+  return callback(null, { origin: false })
+}
+
+app.use(cors(corsOptionsDelegate))
+app.options('*', cors(corsOptionsDelegate))
 app.use(express.json({ limit: '4mb' }))
 app.use(express.urlencoded({ extended: true }))
 
