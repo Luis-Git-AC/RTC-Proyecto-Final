@@ -8,10 +8,29 @@ const PORT = process.env.PORT || 5000;
 
 connectDB();
 
-app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:5173',
-  credentials: true
-}));
+const parseOrigins = (value) =>
+  (value || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+const devFallbackOrigins = ['http://localhost:5173', 'http://localhost:5174'];
+const envOrigins = process.env.FRONTEND_URLS
+  ? parseOrigins(process.env.FRONTEND_URLS)
+  : (process.env.FRONTEND_URL ? [process.env.FRONTEND_URL] : devFallbackOrigins);
+const allowedOrigins = new Set(envOrigins);
+
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      if (!origin) return callback(null, true);
+      if (allowedOrigins.has(origin)) return callback(null, true);
+      return callback(new Error(`CORS: Origin not allowed: ${origin}`));
+    },
+    credentials: true,
+  })
+);
+app.options('*', cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -21,12 +40,19 @@ const postRoutes = require('./routes/posts');
 const commentRoutes = require('./routes/comments');
 const resourceRoutes = require('./routes/resources');
 const userRoutes = require('./routes/users');
+let bootstrapRoutes = null;
+try {
+  bootstrapRoutes = require('./routes/bootstrap');
+} catch {}
 
 app.use('/api/auth', authRoutes);
 app.use('/api/posts', postRoutes);
 app.use('/api/comments', commentRoutes);
 app.use('/api/resources', resourceRoutes);
 app.use('/api/users', userRoutes);
+if (process.env.ALLOW_BOOTSTRAP === 'true') {
+  app.use('/api/bootstrap', bootstrapRoutes);
+}
 
 
 app.get('/', (req, res) => {

@@ -11,6 +11,71 @@ const checkRole = require('../middleware/checkRole');
 const { uploadSingle, handleMulterError } = require('../middleware/upload');
 const { uploadToCloudinary, deleteFromCloudinary } = require('../config/cloudinary');
 
+router.get('/me/portfolio', auth, async (req, res) => {
+  try {
+    const user = await User.findById(req.userId).select('portfolio');
+    if (!user) {
+      return res.status(404).json({ error: 'Usuario no encontrado' });
+    }
+    const items = Array.isArray(user.portfolio) ? user.portfolio : [];
+    res.status(200).json({ items });
+  } catch (error) {
+    console.error('Error al obtener portfolio:', error);
+    res.status(500).json({ error: 'Error al obtener portfolio' });
+  }
+});
+
+router.put(
+  '/me/portfolio',
+  auth,
+  [
+    body('items')
+      .isArray({ min: 0 })
+      .withMessage('El campo items debe ser un arreglo'),
+    body('items.*.coinId')
+      .isString()
+      .withMessage('coinId debe ser string')
+      .bail()
+      .notEmpty()
+      .withMessage('coinId es obligatorio'),
+    body('items.*.amount')
+      .isFloat({ min: 0 })
+      .withMessage('amount debe ser un número mayor o igual a 0')
+  ],
+  async (req, res) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({ errors: errors.array() });
+      }
+
+      const user = await User.findById(req.userId);
+      if (!user) {
+        return res.status(404).json({ error: 'Usuario no encontrado' });
+      }
+
+      const { items } = req.body;
+
+      const normalized = (items || []).map(({ coinId, amount }) => ({
+        coinId: String(coinId).trim(),
+        amount: Number(amount),
+        addedAt: new Date()
+      }));
+
+      user.portfolio = normalized;
+      await user.save();
+
+      res.status(200).json({
+        message: 'Portfolio actualizado',
+        items: user.portfolio
+      });
+    } catch (error) {
+      console.error('Error al actualizar portfolio:', error);
+      res.status(500).json({ error: 'Error al actualizar portfolio' });
+    }
+  }
+);
+
 router.get('/profile', auth, async (req, res) => {
   try {
     const user = await User.findById(req.userId).select('-password');
@@ -45,7 +110,11 @@ router.put(
       .trim()
       .isEmail()
       .withMessage('Email inválido')
-      .normalizeEmail(),
+      .normalizeEmail({
+        gmail_remove_dots: false,
+        gmail_remove_subaddress: false,
+        gmail_convert_googlemaildotcom: false
+      }),
     
     body('password')
       .optional()

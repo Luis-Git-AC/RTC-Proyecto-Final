@@ -1,11 +1,17 @@
-import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import PortfolioContext from './PortfolioContext'
+import { useAuth } from './useAuth'
+import { getPortfolio as apiGetPortfolio, savePortfolio as apiSavePortfolio } from '../services/portfolio'
 
 const STORAGE_KEY = 'portfolio_v1'
 
-function readStorage() {
+function storageKeyFor(userId) {
+  return `${STORAGE_KEY}:${userId || 'guest'}`
+}
+
+function readStorage(userId) {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY)
+    const raw = localStorage.getItem(storageKeyFor(userId))
     if (!raw) return []
     const parsed = JSON.parse(raw)
     if (!Array.isArray(parsed)) return []
@@ -16,49 +22,84 @@ function readStorage() {
   }
 }
 
-function writeStorage(portfolio) {
+function writeStorage(userId, portfolio) {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(portfolio))
+    localStorage.setItem(storageKeyFor(userId), JSON.stringify(portfolio))
   } catch (err) {
     console.warn('No se pudo guardar el portfolio en localStorage:', err)
   }
 }
 
 function sanitizeCoin(coin) {
-  const {
-    id,
-    symbol,
-    name,
-    image,
-    currentPrice,
-    marketCap,
-    marketCapRank,
-    priceChangePercentage24h,
-    totalVolume,
-    cantidad
-  } = coin
-
+  const { id, cantidad } = coin
   return {
     id,
-    symbol,
-    name,
-    image,
-    currentPrice,
-    marketCap,
-    marketCapRank,
-    priceChangePercentage24h,
-    totalVolume,
     cantidad: cantidad || 1,
     addedAt: Date.now()
   }
 }
 
 function PortfolioProvider({ children }) {
-  const [portfolio, setPortfolio] = useState(() => readStorage())
+  const { user, token, isAuthenticated } = useAuth()
+  const [portfolio, setPortfolio] = useState([])
+  const syncingRef = useRef(false)
+  const lastSyncedSnapshotRef = useRef('')
 
   useEffect(() => {
-    writeStorage(portfolio)
-  }, [portfolio])
+    const uid = user?._id || null
+    const localItems = readStorage(uid)
+    setPortfolio(localItems)
+  }, [user?._id])
+
+  useEffect(() => {
+    let cancelled = false
+    if (!isAuthenticated || !token) return
+    ;(async () => {
+      try {
+        const data = await apiGetPortfolio(token)
+        if (cancelled) return
+        const mapped = (data?.items || []).map(({ coinId, amount, addedAt }) => ({
+          id: String(coinId),
+          cantidad: Number(amount) || 0,
+          addedAt: addedAt ? new Date(addedAt).getTime() : Date.now(),
+        }))
+        setPortfolio(mapped)
+        writeStorage(user?._id, mapped)
+        lastSyncedSnapshotRef.current = JSON.stringify(
+          mapped.map(({ id, cantidad }) => ({ coinId: id, amount: cantidad || 0 }))
+        )
+      } catch (err) {
+        console.warn('No se pudo obtener el portfolio del servidor:', err?.message || err)
+      }
+    })()
+    return () => { cancelled = true }
+  }, [isAuthenticated, token, user?._id])
+
+  useEffect(() => {
+    writeStorage(user?._id, portfolio)
+  }, [portfolio, user?._id])
+
+  useEffect(() => {
+    if (!isAuthenticated || !token) return
+    const payloadItems = portfolio.map(({ id, cantidad }) => ({ coinId: id, amount: cantidad || 0 }))
+    const snapshot = JSON.stringify(payloadItems)
+    if (snapshot === lastSyncedSnapshotRef.current) return
+
+    const timer = setTimeout(async () => {
+      if (syncingRef.current) return
+      try {
+        syncingRef.current = true
+        await apiSavePortfolio(token, payloadItems)
+        lastSyncedSnapshotRef.current = snapshot
+      } catch (err) {
+        console.warn('No se pudo sincronizar el portfolio con el servidor:', err?.message || err)
+      } finally {
+        syncingRef.current = false
+      }
+    }, 400)
+
+    return () => clearTimeout(timer)
+  }, [portfolio, isAuthenticated, token])
 
   const isInPortfolio = useCallback(
     (coinId) => portfolio.some((item) => item.id === coinId),

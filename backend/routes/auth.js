@@ -19,7 +19,11 @@ router.post(
       .trim()
       .isEmail()
       .withMessage('Debe proporcionar un email válido')
-      .normalizeEmail(),
+      .normalizeEmail({
+        gmail_remove_dots: false,
+        gmail_remove_subaddress: false,
+        gmail_convert_googlemaildotcom: false
+      }),
     
     body('password')
       .isLength({ min: 6 })
@@ -97,7 +101,11 @@ router.post(
       .trim()
       .isEmail()
       .withMessage('Debe proporcionar un email válido')
-      .normalizeEmail(),
+      .normalizeEmail({
+        gmail_remove_dots: false,
+        gmail_remove_subaddress: false,
+        gmail_convert_googlemaildotcom: false
+      }),
     
     body('password')
       .notEmpty()

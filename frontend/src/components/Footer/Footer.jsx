@@ -4,7 +4,7 @@ function Footer() {
   return (
     <footer className={styles.footer}>
       <div className={styles.container}>
-        <p className={styles.credit}>Proyecto 4 • Luis</p>
+        <p className={styles.credit}>Proyecto 5 • Luis</p>
         <p className={styles.apis}>
           Agradecimientos:{' '}
           <a 

@@ -34,6 +34,24 @@ const userSchema = new mongoose.Schema({
     enum: ['user', 'admin'],
     default: 'user'
   },
+  portfolio: [
+    {
+      coinId: {
+        type: String,
+        required: true,
+        trim: true
+      },
+      amount: {
+        type: Number,
+        required: true,
+        min: [0, 'La cantidad no puede ser negativa']
+      },
+      addedAt: {
+        type: Date,
+        default: Date.now
+      }
+    }
+  ],
   createdAt: {
     type: Date,
     default: Date.now

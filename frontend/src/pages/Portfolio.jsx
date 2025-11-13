@@ -17,10 +17,13 @@ function Portfolio() {
   const { coins } = useCriptos()
 
   const portfolioWithFreshPrices = useMemo(() => {
-    return portfolio.map(saved => {
-      const fresh = coins.find(c => c.id === saved.id)
-      return fresh ? { ...fresh, cantidad: saved.cantidad } : saved
-    })
+    return portfolio
+      .map((saved) => {
+        const fresh = coins.find((c) => c.id === saved.id)
+        if (!fresh) return null
+        return { ...fresh, cantidad: saved.cantidad }
+      })
+      .filter(Boolean)
   }, [portfolio, coins])
 
   const totalValue = useMemo(() => {
