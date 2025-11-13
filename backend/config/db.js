@@ -12,8 +12,11 @@ const connectDB = async () => {
   if (!cached.promise) {
     const uri = process.env.MONGODB_URI
     if (!uri) throw new Error('MONGODB_URI no está definido')
+    const options = {
+      serverSelectionTimeoutMS: 5000,
+    }
     cached.promise = mongoose
-      .connect(uri)
+      .connect(uri, options)
       .then((mongooseInstance) => {
         console.log(`✅ MongoDB conectado: ${mongooseInstance.connection.host}`)
         console.log(`📊 Base de datos: ${mongooseInstance.connection.name}`)

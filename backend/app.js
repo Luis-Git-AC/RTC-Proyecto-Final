@@ -5,6 +5,10 @@ const connectDB = require('./config/db')
 
 const app = express()
 
+console.log('🔧 Iniciando CryptoHub API')
+console.log('NODE_ENV:', process.env.NODE_ENV || 'development')
+console.log('MONGODB_URI set?:', Boolean(process.env.MONGODB_URI))
+
 connectDB().catch((err) => {
   console.error('❌ Error al conectar a MongoDB en boot:', err?.message || err)
 })
